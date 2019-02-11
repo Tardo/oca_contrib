@@ -10,6 +10,7 @@
 # License GPL-3.0 or later (http://www.gnu.org/licenses/gpl).
 ##########################################################
 
+GIT_DEF_REMOTE="origin"
 
 print_help()
 {
@@ -39,29 +40,25 @@ create_docker()
     echo "ERROR: Invalid params!"
     echo "Syntaxis: docker create <proj_name> <version>"
   else
-    git clone https://github.com/Tecnativa/doodba-scaffolding.git $PROJ_NAME --depth=1
-    cd $PROJ_NAME
-    sed -i "s/\(ODOO_MAJOR *= *\).*/\1$ODOO_VER/" .env
-    sed -i "s/\(ODOO_MINOR *= *\).*/\1$ODOO_VER.0/" .env
-    sed -i "s/\(DB_VERSION *= *\).*/\1$ODOO_VER/" .env
-    ln -s devel.yaml docker-compose.yml
-    chown -R $USER:1000 odoo/auto
-    chmod -R ug+rwX odoo/auto
-    export UID GID="$(id -g $USER)" UMASK="$(umask)"
-    docker-compose build --pull
+    git clone https://github.com/Tecnativa/doodba-scaffolding.git $PROJ_NAME --depth=1 &&
+    cd $PROJ_NAME &&
+    sed -i "s/\(ODOO_MAJOR *= *\).*/\1$ODOO_VER/" .env &&
+    sed -i "s/\(ODOO_MINOR *= *\).*/\1$ODOO_VER.0/" .env &&
+    sed -i "s/\(DB_VERSION *= *\).*/\1$ODOO_VER/" .env &&
+    ln -s devel.yaml docker-compose.yml &&
+    chown -R $USER:1000 odoo/auto &&
+    chmod -R ug+rwX odoo/auto &&
+    export UID GID="$(id -g $USER)" UMASK="$(umask)" &&
+    docker-compose build --pull &&
     docker-compose -f setup-devel.yaml run --rm odoo
-    echo -e "\nDocker created successfully"
   fi
 }
 
 resync_modules()
 {
   if [ -f "setup-devel.yaml" ]; then
-    chown -R $USER:1000 odoo/auto
-    chmod -R ug+rwX odoo/auto
-    export UID GID="$(id -g $USER)" UMASK="$(umask)"
+    export UID GID="$(id -g $USER)" UMASK="$(umask)" &&
     docker-compose -f setup-devel.yaml run --rm odoo
-    echo -e "\nModules resynced successfully"
   else
     echo "ERROR: Can't found setup-devel.yaml"
   fi
@@ -95,11 +92,11 @@ add_modules()
     defaults:
         depth: \$DEPTH_DEFAULT
     remotes:
-        origin: $REPO
+        $GIT_DEF_REMOTE: $REPO
     target:
-        origin \$ODOO_VERSION
+        $GIT_DEF_REMOTE \$ODOO_VERSION
     merges:
-        - origin \$ODOO_VERSION
+        - $GIT_DEF_REMOTE \$ODOO_VERSION
 EOT
       echo "${REPO_NAME_ARR[0]}:" >> src/addons.yaml
       if [ -z $MODULES ]; then
@@ -111,7 +108,6 @@ EOT
           echo "  - \"$MODULE_NAME\"" >> src/addons.yaml
         done
       fi
-      echo -e "\nModules added successfully"
     fi
   fi
 }
@@ -131,10 +127,10 @@ fix_history()
     echo "ERROR: Invalid params!"
     echo "Syntaxis: git fix-history <module> <version> <hash>"
   else
-    git reset --hard oca/$ODOO_VER.0
-    git format-patch --keep-subject --stdout origin/$ODOO_VER.0..origin/$ODOO_FROM_VER.0 -- $MODULE | git am -3 --keep
+    git fetch $GIT_DEF_REMOTE &&
+    git reset --hard $GIT_DEF_REMOTE/$ODOO_VER.0 &&
+    git format-patch --keep-subject --stdout $GIT_DEF_REMOTE/$ODOO_VER.0..$GIT_DEF_REMOTE/$ODOO_FROM_VER.0 -- $MODULE | git am -3 --keep &&
     git cherry-pick $HASH
-    echo -e "\nBranch history fixed successfully"
   fi
 }
 
@@ -148,10 +144,9 @@ mig_module()
     echo "ERROR: Invalid params!"
     echo "Syntaxis: git migrate <module> <version>"
   else
-    git fetch origin
-    git checkout -b $ODOO_VER.0-mig-$MODULE origin/$ODOO_VER.0
-    git format-patch --keep-subject --stdout origin/$ODOO_VER.0..origin/$ODOO_FROM_VER.0 -- $MODULE | git am -3 --keep
-    echo -e "\nWork branch created succesfully. All ready to start the hard work!"
+    git fetch $GIT_DEF_REMOTE &&
+    git checkout -b $ODOO_VER.0-mig-$MODULE $GIT_DEF_REMOTE/$ODOO_VER.0 &&
+    git format-patch --keep-subject --stdout $GIT_DEF_REMOTE/$ODOO_VER.0..$GIT_DEF_REMOTE/$ODOO_FROM_VER.0 -- $MODULE | git am -3 --keep
   fi
 }
 

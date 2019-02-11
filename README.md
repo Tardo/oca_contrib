@@ -41,7 +41,7 @@ Add repository and enable modules to be installed. _Run this command inside the 
 
 ```$ oca_contrib docker add_modules https://github.com/OCA/web.git web_responsive,web_widget_color```
 
-*** Example, add OCA/l10n-spain repository with all modules
+** Example, add OCA/l10n-spain repository with all modules
 
 ```$ oca_contrib docker add_modules https://github.com/OCA/l10n-spain.git```
 
@@ -61,7 +61,7 @@ Preapare a new branch to start a migration of a module. _Run this command inside
 - module > Module names
 - version > Odoo version (avoid .0)
 
-*** Example, migrate web_shortcut to v11.0.
+** Example, migrate web_shortcut to v11.0.
 
 ```$ oca_contrib git migrate web_shortcut 11```
 
