@@ -148,6 +148,7 @@ mig_module()
     echo "ERROR: Invalid params!"
     echo "Syntaxis: git migrate <module> <version>"
   else
+    git fetch origin
     git checkout -b $ODOO_VER.0-mig-$MODULE origin/$ODOO_VER.0
     git format-patch --keep-subject --stdout origin/$ODOO_VER.0..origin/$ODOO_FROM_VER.0 -- $MODULE | git am -3 --keep
     echo -e "\nWork branch created succesfully. All ready to start the hard work!"
