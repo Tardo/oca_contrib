@@ -84,7 +84,7 @@ add_modules()
     REPO=$1
     MODULES=$2
 
-    if [ -z $REPO ] || [ -z $MODULES ]; then
+    if [ -z $REPO ]; then
       echo "ERROR: Invalid params!"
       echo "Syntaxis: docker add_modules <repo> [modules (separated by comma without spaces)]"
     else
