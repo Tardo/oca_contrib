@@ -12,7 +12,7 @@ The script uses awesome Odoo projects!
 
 ## INSTALLATION
 ```
-$ wget https://raw.github.com/Tardo/oca_contrib/oca_contrib.sh -o /usr/local/bin/oca_contrib && chmod +x /usr/local/bin/oca_contrib
+$ sudo wget https://raw.githubusercontent.com/Tardo/oca_contrib/master/oca_contrib.sh -O /usr/local/bin/oca_contrib && sudo chmod +x /usr/local/bin/oca_contrib
 ```
 
 ## USAGE
