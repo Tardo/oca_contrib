@@ -44,7 +44,6 @@ create_docker()
     cd $PROJ_NAME &&
     sed -i "s/\(ODOO_MAJOR *= *\).*/\1$ODOO_VER/" .env &&
     sed -i "s/\(ODOO_MINOR *= *\).*/\1$ODOO_VER.0/" .env &&
-    sed -i "s/\(DB_VERSION *= *\).*/\1$ODOO_VER/" .env &&
     ln -s devel.yaml docker-compose.yml &&
     chown -R $USER:1000 odoo/auto &&
     chmod -R ug+rwX odoo/auto &&
