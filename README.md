@@ -8,14 +8,21 @@ The script uses awesome Odoo projects!
 - Doodba by Tecnactiva
 - OCA Mantainer Tools Wiki
 
-**/!\ This script can be dangerous if you don't know what you're doing!**
+**/!\ This script can be dangerous (for your local branch) if you don't know what you're doing!**
+
+## SYSTEM DEPENDENCIES
+- git
+- docker _https://docs.docker.com/install/linux/linux-postinstall/_
+- docker-compose
 
 ## INSTALLATION
 ```
 $ sudo wget https://raw.githubusercontent.com/Tardo/oca_contrib/master/oca_contrib.sh -O /usr/local/bin/oca_contrib && sudo chmod +x /usr/local/bin/oca_contrib
 ```
+If you don't want/can't use root privileges to install, only download and use it. The better option is use ```~/.local/bin``` folder... but some distros haven't set these folder into $PATH
 
 ## USAGE
+_Pay attention that the script doesn't use x.0 version notation. If you want 11.0 type 11 (without .0 sufix)_
 
 #### + DOCKER MANAGEMENT (DOODBA)
 For more information see https://github.com/Tecnativa/doodba
@@ -80,3 +87,5 @@ To use this you need squash your commits first and get the hash of these commit.
 ** Example, restore history to web_shortcut migration. Previously squashed in 1234abc567de
 
 ```$ oca_contrib git fix_history web_shortcut 11 1234abc567de```
+
+** Perhaps needs resolve some conflicts to finish the operation.
