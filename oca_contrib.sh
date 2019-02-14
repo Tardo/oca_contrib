@@ -171,6 +171,6 @@ elif [ "$TOOL" = "git" ]; then
   if [ "$ACTION" = "migrate" ]; then
     mig_module $3 $4
   elif [ "$ACTION" = "fix-history" ]; then
-    fix_history $3 $4
+    fix_history $3 $4 $5
   fi
 fi
