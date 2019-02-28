@@ -26,7 +26,7 @@ _Pay attention that the script doesn't use x.0 version notation. If you want 11.
 
 #### + DOCKER MANAGEMENT (DOODBA)
 For more information see https://github.com/Tecnativa/doodba
-###### Create
+###### ⚫ Create
 Create a odoo docker in devel mode
 
 ```$ oca_contrib docker create <proj_name> <version>```
@@ -37,7 +37,7 @@ Create a odoo docker in devel mode
 
 ```$ oca_contrib docker create myproject 10```
 
-###### Add Modules
+###### ⚫ Add Modules
 Add repository and enable modules to be installed. _Run this command inside the docker project folder._
 
 ```$ oca_contrib docker add_modules <repo> [modules (separated by comma without spaces)]```
@@ -52,7 +52,25 @@ Add repository and enable modules to be installed. _Run this command inside the 
 
 ```$ oca_contrib docker add_modules https://github.com/OCA/l10n-spain.git```
 
-###### Resync Modules
+###### ⚫ Delete Modules
+Remove repository and modules from repos.yaml and addons.yaml. _Run this command inside the docker project folder._
+
+```$ oca_contrib docker del_modules <repo>```
+
+** Example, remove OCA/l10n-spain repository with all modules
+
+```$ oca_contrib docker del_modules https://github.com/OCA/l10n-spain.git```
+
+###### ⚫ Test Modules
+Launch unittest of selected modules. _Run this command inside the docker project folder._
+
+```$ oca_contrib docker test_modules <modules (separated by comma without spaces)>```
+
+** Example, test web_responsive and web_notify modules
+
+```$ oca_contrib docker test_modules web_responsive,web_notify```
+
+###### ⚫ Resync Modules
 Re-launch git_aggregator. _Run this command inside the docker project folder._
 
 **/!\ This command can be dangerous!**
@@ -61,7 +79,7 @@ Re-launch git_aggregator. _Run this command inside the docker project folder._
 
 #### + GIT MANAGEMENT
 For more information see https://github.com/OCA/maintainer-tools/wiki
-###### Migrate
+###### ⚫ Migrate
 Preapare a new branch to start a migration of a module. _Run this command inside the repository folder._
 
 ```$ oca_contrib git migrate <module> <version>```
@@ -72,7 +90,7 @@ Preapare a new branch to start a migration of a module. _Run this command inside
 
 ```$ oca_contrib git migrate web_shortcut 11```
 
-###### Fix History
+###### ⚫ Fix History
 Restore git commits history on migration module. **Only usefull if you missed it.** _Run this command inside the repository folder. Using the branch to fix._
 
 **/!\ This command can be dangerous!**
