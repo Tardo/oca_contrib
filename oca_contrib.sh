@@ -1,4 +1,4 @@
-#!/usr/bin/sh
+#!/bin/bash
 ##########################################################
 # OCA Contrib
 # 'Copyright' 2019 Alexandre Díaz - <dev@redneboa.es>
@@ -29,6 +29,7 @@ print_help()
   echo "Example: $0 docker create my_project 12"
 
 }
+
 
 #== DOCKER
 
@@ -96,7 +97,7 @@ add_modules()
       echo "This repo already exists.  Aborting."
       exit 1
     else
-      cat <<EOT >> src/repos.yaml
+      cat <<EOF >> src/repos.yaml
 ./${REPO_NAME_ARR[0]}:
     defaults:
         depth: \$DEPTH_DEFAULT
@@ -106,7 +107,7 @@ add_modules()
         $GIT_DEF_REMOTE \$ODOO_VERSION
     merges:
         - $GIT_DEF_REMOTE \$ODOO_VERSION
-EOT
+EOF
       echo "${REPO_NAME_ARR[0]}:" >> src/addons.yaml
       if [ -z $MODULES ]; then
         echo "  - \"*\"" >> src/addons.yaml
@@ -129,12 +130,12 @@ del_modules()
   IFS='/' read -ra REPO_ARR <<< "$REPO"
   IFS='.' read -ra REPO_NAME_ARR <<< "${REPO_ARR[-1]}"
   if grep -Fxq "./${REPO_NAME_ARR[0]}:" src/repos.yaml; then
+    sed -i "/\.\/${REPO_NAME_ARR[0]}:/,/^\./{//!d};/\.\/${REPO_NAME_ARR[0]}:/d" src/repos.yaml &&
+    sed -i "/${REPO_NAME_ARR[0]}:/, /^[^ ]/{//!d};/${REPO_NAME_ARR[0]}:/d" src/addons.yaml &&
+    echo -e "\nModules deleted successfully."
+  else
     echo "This repo is not present on repos.yaml.  Aborting."
     exit 1
-  else
-    sed -n "/^\.\/$REPO_NAME_ARR[0]:(?:\s\s.|.)*$/!p" src/repos.yaml &&
-    sed -n "/^$REPO_NAME_ARR[0]:(?:\s\s.|.)*$/!p" src/addons.yaml &&
-    echo -e "\nModules deleted successfully."
   fi
 }
 
@@ -211,7 +212,7 @@ if [ "$TOOL" = "docker" ]; then
   elif [ "$ACTION" = "add_modules" ]; then
     add_modules $3 $4
   elif [ "$ACTION" = "del_modules" ]; then
-    del_modules $3 $4
+    del_modules $3
   elif [ "$ACTION" = "resync_modules" ]; then
     resync_modules
   elif [ "$ACTION" = "test_modules" ]; then

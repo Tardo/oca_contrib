@@ -1,4 +1,4 @@
-# OCA CONTRIB Shell Script
+# OCA CONTRIB Shell Script for BASH
 This is a simple tool for development envirionments focused to avoid repetitive tasks.
 You can see it like a recopilation of usefull snippets.
 
@@ -24,7 +24,7 @@ If you don't want/can't use root privileges to install, only download and use it
 ## USAGE
 _Pay attention that the script doesn't use x.0 version notation. If you want 11.0 type 11 (without .0 sufix)_
 
-#### + DOCKER MANAGEMENT (DOODBA)
+### + DOCKER MANAGEMENT (DOODBA)
 For more information see https://github.com/Tecnativa/doodba
 ###### ⚫ Create
 Create a odoo docker in devel mode
@@ -77,7 +77,7 @@ Re-launch git_aggregator. _Run this command inside the docker project folder._
 
 ```$ oca_contrib docker resync_modules```
 
-#### + GIT MANAGEMENT
+### + GIT MANAGEMENT
 For more information see https://github.com/OCA/maintainer-tools/wiki
 ###### ⚫ Migrate
 Preapare a new branch to start a migration of a module. _Run this command inside the repository folder._
