@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 ##########################################################
 # OCA Contrib
 # 'Copyright' 2019 Alexandre Díaz - <dev@redneboa.es>
@@ -24,8 +24,8 @@ print_help()
   echo "    · resync_modules"
   echo "    · test_modules <modules (separated by comma without spaces)>"
   echo "  - git"
-  echo "    · migrate <module> <version>"
-  echo "    · fix-history <module> <version> <hash>"
+  echo "    · migrate <module> <version_to> [version_from]"
+  echo "    · fix-history <module> <hash> <version_to> [version_from]"
   echo "Example: $0 docker create my_project 12"
 
 }
@@ -52,6 +52,11 @@ create_docker()
     sed -i "s/\(ODOO_MAJOR *= *\).*/\1$ODOO_VER/" .env &&
     sed -i "s/\(ODOO_MINOR *= *\).*/\1$ODOO_VER.0/" .env &&
     ln -s devel.yaml docker-compose.yml &&
+    if [ $ODOO_VER -lt 9 ]; then
+      sed -i "s/\(- --dev=*\).*/ /" devel.yaml
+    elif [ $ODOO_VER = "9" ]; then
+      sed -i "s/\(- --dev*\).*/\1 /" devel.yaml
+    fi
     chown -R $USER:1000 odoo/auto &&
     chmod -R ug+rwX odoo/auto &&
     export UID GID="$(id -g $USER)" UMASK="$(umask)" &&
@@ -125,13 +130,11 @@ EOF
 
 del_modules()
 {
-  REPO=$1
+  REPO_NAME=$1
 
-  IFS='/' read -ra REPO_ARR <<< "$REPO"
-  IFS='.' read -ra REPO_NAME_ARR <<< "${REPO_ARR[-1]}"
-  if grep -Fxq "./${REPO_NAME_ARR[0]}:" src/repos.yaml; then
-    sed -i "/\.\/${REPO_NAME_ARR[0]}:/,/^\./{//!d};/\.\/${REPO_NAME_ARR[0]}:/d" src/repos.yaml &&
-    sed -i "/${REPO_NAME_ARR[0]}:/, /^[^ ]/{//!d};/${REPO_NAME_ARR[0]}:/d" src/addons.yaml &&
+  if grep -Fxq "./${REPO_NAME}:" src/repos.yaml; then
+    sed -i "/\.\/${REPO_NAME}:/,/^\./{//!d};/\.\/${REPO_NAME}:/d" src/repos.yaml &&
+    sed -i "/${REPO_NAME}:/, /^[^ ]/{//!d};/${REPO_NAME}:/d" src/addons.yaml &&
     echo -e "\nModules deleted successfully."
   else
     echo "This repo is not present on repos.yaml.  Aborting."
@@ -155,14 +158,18 @@ test_modules()
 fix_history()
 {
   MODULE=$1
-  ODOO_VER=$2
-  HASH=$3
-  ODOO_FROM_VER=`expr $ODOO_VER - 1`
+  HASH=$2
+  ODOO_VER=$3
+  ODOO_FROM_VER=$4
 
-  if [ -z $MODULE ] || [ -z $ODOO_VER ] || [ -z $HASH ]; then
+  if [ -z $ODOO_FROM_VER ]; then
+    ODOO_FROM_VER=`expr $ODOO_VER - 1`
+  fi
+
+  if [ -z $ODOO_VER ]; then
     echo "ERROR: Invalid params!  Aborting."
-    echo "Syntaxis: git fix-history <module> <version> <hash>"
-  elif ! [[ $ODOO_VER =~ $REGEX_NUMBER ]]; then
+    echo "Syntaxis: git fix-history <module> <hash> <version_to> [version_from]"
+  elif ! [[ $ODOO_VER =~ $REGEX_NUMBER ]] || ! [[ $ODOO_FROM_VER =~ $REGEX_NUMBER ]]; then
     echo "Invalid Odoo Version.  Aborting."
     echo "TIP: Pay attention that the script doesn't use x.0 version notation. If you want 11.0 type 11 (without .0 sufix)"
   else
@@ -178,9 +185,13 @@ mig_module()
 {
   MODULE=$1
   ODOO_VER=$2
-  ODOO_FROM_VER=`expr $ODOO_VER - 1`
+  ODOO_FROM_VER=$3
 
-  if [ -z $MODULE ] || [ -z $ODOO_VER ]; then
+  if [ -z $ODOO_FROM_VER ]; then
+    ODOO_FROM_VER=`expr $ODOO_VER - 1`
+  fi
+
+  if [ -z $ODOO_VER ]; then
     echo "ERROR: Invalid params!  Aborting."
     echo "Syntaxis: git migrate <module> <version>"
   elif ! [[ $ODOO_VER =~ $REGEX_NUMBER ]]; then
@@ -195,6 +206,7 @@ mig_module()
 }
 
 
+
 #== MAIN
 TOOL=$1
 ACTION=$2
@@ -202,38 +214,38 @@ ACTION=$2
 if [ -z $TOOL ] || [ -z $ACTION ]; then
   echo "Invalid parameters!  Aborting."
   print_help
-fi
-
-ACTION_ERROR=0
-
-if [ "$TOOL" = "docker" ]; then
-  if [ "$ACTION" = "create" ]; then
-    create_docker $3 $4
-  elif [ "$ACTION" = "add_modules" ]; then
-    add_modules $3 $4
-  elif [ "$ACTION" = "del_modules" ]; then
-    del_modules $3
-  elif [ "$ACTION" = "resync_modules" ]; then
-    resync_modules
-  elif [ "$ACTION" = "test_modules" ]; then
-    test_modules $3
-  else
-    ACTION_ERROR=1
-  fi
-elif [ "$TOOL" = "git" ]; then
-  if [ "$ACTION" = "migrate" ]; then
-    mig_module $3 $4
-  elif [ "$ACTION" = "fix-history" ]; then
-    fix_history $3 $4 $5
-  else
-    ACTION_ERROR=1
-  fi
 else
-  echo "Invalid '$TOOL' Tool!  Aborting."
-  print_help
-fi
+  ACTION_ERROR=0
 
-if [ $ACTION_ERROR -eq 1 ]; then
-  echo "Invalid '$ACTION' Action!  Aborting."
-  print_help
+  if [ "$TOOL" = "docker" ]; then
+    if [ "$ACTION" = "create" ]; then
+      create_docker $3 $4
+    elif [ "$ACTION" = "add_modules" ]; then
+      add_modules $3 $4
+    elif [ "$ACTION" = "del_modules" ]; then
+      del_modules $3
+    elif [ "$ACTION" = "resync_modules" ]; then
+      resync_modules
+    elif [ "$ACTION" = "test_modules" ]; then
+      test_modules $3
+    else
+      ACTION_ERROR=1
+    fi
+  elif [ "$TOOL" = "git" ]; then
+    if [ "$ACTION" = "migrate" ]; then
+      mig_module $3 $4 $5
+    elif [ "$ACTION" = "fix-history" ]; then
+      fix_history $3 $4 $5 $6
+    else
+      ACTION_ERROR=1
+    fi
+  else
+    echo "Invalid '$TOOL' Tool!  Aborting."
+    print_help
+  fi
+
+  if [ $ACTION_ERROR -eq 1 ]; then
+    echo "Invalid '$ACTION' Action!  Aborting."
+    print_help
+  fi
 fi

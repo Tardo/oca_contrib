@@ -55,11 +55,11 @@ Add repository and enable modules to be installed. _Run this command inside the 
 ###### ⚫ Delete Modules
 Remove repository and modules from repos.yaml and addons.yaml. _Run this command inside the docker project folder._
 
-```$ oca_contrib docker del_modules <repo>```
+```$ oca_contrib docker del_modules <repo_name>```
 
 ** Example, remove OCA/l10n-spain repository with all modules
 
-```$ oca_contrib docker del_modules https://github.com/OCA/l10n-spain.git```
+```$ oca_contrib docker del_modules l10n-spain```
 
 ###### ⚫ Test Modules
 Launch unittest of selected modules. _Run this command inside the docker project folder._
@@ -82,20 +82,24 @@ For more information see https://github.com/OCA/maintainer-tools/wiki
 ###### ⚫ Migrate
 Preapare a new branch to start a migration of a module. _Run this command inside the repository folder._
 
-```$ oca_contrib git migrate <module> <version>```
+```$ oca_contrib git migrate <module> <version_to> [version_from]```
 - module > Module names
 - version > Odoo version (avoid .0)
 
-** Example, migrate web_shortcut to v11.0.
+** Example, migrate web_shortcut to v11.0. (from v10.0)
 
 ```$ oca_contrib git migrate web_shortcut 11```
+
+** Example, migrate web_shortcut to v12.0. (from v10.0)
+
+```$ oca_contrib git migrate web_shortcut 12 10```
 
 ###### ⚫ Fix History
 Restore git commits history on migration module. **Only usefull if you missed it.** _Run this command inside the repository folder. Using the branch to fix._
 
 **/!\ This command can be dangerous!**
 
-```$ oca_contrib git fix_history <module> <version> <hash>```
+```$ oca_contrib git fix_history <module> <hash> <version_to> [version_from]```
 - module > Module name
 - version > Odoo version (avoid .0)
 - hash > Hash of commit to restore your work
@@ -104,6 +108,6 @@ To use this you need squash your commits first and get the hash of these commit.
 
 ** Example, restore history to web_shortcut migration. Previously squashed in 1234abc567de
 
-```$ oca_contrib git fix_history web_shortcut 11 1234abc567de```
+```$ oca_contrib git fix_history web_shortcut 1234abc567de 12 10```
 
 ** Perhaps needs resolve some conflicts to finish the operation.
