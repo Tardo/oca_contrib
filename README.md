@@ -21,13 +21,23 @@ $ sudo wget https://raw.githubusercontent.com/Tardo/oca_contrib/master/oca_contr
 ```
 If you don't want/can't use root privileges to install, only download and use it. The better option is use ```~/.local/bin``` folder... but some distros haven't set these folder into $PATH
 
-## USAGE
+## EXAMPLE USAGE
+Odoo 12.0 + Add OCA/web repository (all modules enabled)
+```
+$ oca_contrib docker create myproject 12
+$ cd myproject
+$ oca_contrib docker add_modules https://github.com/OCA/web.git
+$ oca_contrib docker build
+$ docker-compose up
+```
+
+# DETAILED USAGE
 _Pay attention that the script doesn't use x.0 version notation. If you want 11.0 type 11 (without .0 sufix)_
 
 ### + DOCKER MANAGEMENT (DOODBA)
 For more information see https://github.com/Tecnativa/doodba
 ###### ⚫ Create
-Create a odoo docker in devel mode
+Download & prepare a generic doodba scaffolding
 
 ```$ oca_contrib docker create <proj_name> <version>```
 - proj_name > The name of the project
@@ -36,6 +46,11 @@ Create a odoo docker in devel mode
 ** Example, create myproject using Odoo 10.0:
 
 ```$ oca_contrib docker create myproject 10```
+
+###### ⚫ Build
+Build the docker (in devel mode). _Run this command inside the docker project folder._
+
+```$ oca_contrib docker build```
 
 ###### ⚫ Add Modules
 Add repository and enable modules to be installed. _Run this command inside the docker project folder._
