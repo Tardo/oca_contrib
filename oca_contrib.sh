@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 ##########################################################
-# OCA Contrib 0.4.0
+# OCA Contrib 0.6.0
 # 'Copyright' 2019 Alexandre Díaz - <dev@redneboa.es>
 #
 # This script is powered by:
@@ -12,7 +12,10 @@
 set -e
 
 GIT_DEF_REMOTE="origin"
-REGEX_NUMBER='^[0-9]+$'
+REGEX_NUMBER='^[0-9]{1,2}\.[0-9]{1,2}[a-Z]?$'
+REGEX_URL='^https?:\/\/'
+PATH_REPOS="odoo/custom/src/repos.yaml"
+PATH_ADDONS="odoo/custom/src/addons.yaml"
 
 print_help()
 {
@@ -21,14 +24,34 @@ print_help()
   echo "  - docker"
   echo "    · create <proj_name> <version>"
   echo "    · build"
-  echo "    · add_modules <repo> [modules (separated by comma without spaces)]"
-  echo "    · del_modules <repo>"
+  echo "    · add_modules <repo_name/repo> [modules (separated by comma without spaces)]"
+  echo "    · del_modules <repo_name> [modules (separated by comma without spaces)]"
   echo "    · resync_modules"
   echo "    · test_modules <modules (separated by comma without spaces)>"
+  echo "    · install_modules <modules (separated by comma without spaces)>"
+  echo "    · update_modules <modules (separated by comma without spaces)>"
+  echo "    · shell"
   echo "  - git"
   echo "    · migrate <module> <version_to> [version_from]"
-  echo "    · fix-history <module> <hash> <version_to> [version_from]"
+  echo "    · use_pr <pr_number>"
+  echo "    · fix_history <module> <hash> <version_to> [version_from]"
   echo "Example: $0 docker create my_project 12"
+}
+
+
+#== HELPER FUNCTIONS
+
+sanitize_odoo_version()
+{
+  ODOO_VER=$1
+
+  if ! [[ $ODOO_VER =~ $REGEX_NUMBER ]]; then
+    ODOO_VER="$ODOO_VER.0"
+    if ! [[ $ODOO_VER =~ $REGEX_NUMBER ]]; then
+      return
+    fi
+  fi
+  echo $ODOO_VER
 }
 
 
@@ -37,23 +60,20 @@ print_help()
 create_docker()
 {
   PROJ_NAME=$1
-  ODOO_VER=$2
-
+  ODOO_VER=$(sanitize_odoo_version $2)
+  IFS='.' read -ra ODOO_VER_S <<< "$ODOO_VER"
 
   if [ -z $PROJ_NAME ] || [ -z $ODOO_VER ]; then
     echo "ERROR: Invalid params!  Aborting."
     echo "Syntaxis: docker create <proj_name> <version>"
-  elif ! [[ $ODOO_VER =~ $REGEX_NUMBER ]]; then
-    echo "Invalid Odoo Version.  Aborting."
-    echo "TIP: Pay attention that the script doesn't use x.0 version notation. If you want 11.0 type 11 (without .0 sufix)"
   else
     git clone https://github.com/Tecnativa/doodba-scaffolding.git $PROJ_NAME --depth=1
     cd $PROJ_NAME
-    sed -i "s/\(ODOO_MAJOR *= *\).*/\1$ODOO_VER/" .env
-    sed -i "s/\(ODOO_MINOR *= *\).*/\1$ODOO_VER.0/" .env
-    if [ $ODOO_VER -lt 9 ]; then
+    sed -i "s/\(ODOO_MAJOR *= *\).*/\1${ODOO_VER_S[0]}/" .env
+    sed -i "s/\(ODOO_MINOR *= *\).*/\1$ODOO_VER/" .env
+    if [ $(echo "$ODOO_VER < 9.0" | bc) -eq 1 ] ; then
       sed -i "s/\(- --dev=*\).*/ /" devel.yaml
-    elif [ $ODOO_VER = "9" ]; then
+    elif [ $ODOO_VER = "9.0" ]; then
       sed -i "s/\(- --dev*\).*/\1 /" devel.yaml
     fi
     echo -e "\nDocker created successfully."
@@ -63,7 +83,9 @@ create_docker()
 # Code from https://github.com/Tecnativa/doodba#skip-the-boring-parts
 build_docker()
 {
-  ln -s devel.yaml docker-compose.yml
+  if [ ! -f "docker-compose.yml" ]; then
+    ln -s devel.yaml docker-compose.yml
+  fi
   chown -R $USER:1000 odoo/auto
   chmod -R ug+rwX odoo/auto
   export UID GID="$(id -g $USER)" UMASK="$(umask)"
@@ -85,12 +107,12 @@ resync_modules()
 
 add_modules()
 {
-  if [ ! -f "src/repos.yaml" ]; then
+  if [ ! -f $PATH_REPOS ]; then
     echo "ERROR: Can't found repos.yaml.  Aborting."
     exit 1
   fi
 
-  if [ ! -f "src/addons.yaml" ]; then
+  if [ ! -f $PATH_ADDONS ]; then
     echo "ERROR: Can't found addons.yaml.  Aborting."
     exit 1
   fi
@@ -104,11 +126,11 @@ add_modules()
   else
     IFS='/' read -ra REPO_ARR <<< "$REPO"
     IFS='.' read -ra REPO_NAME_ARR <<< "${REPO_ARR[-1]}"
-    if grep -Fxq "./${REPO_NAME_ARR[0]}:" src/repos.yaml; then
-      echo "This repo already exists.  Aborting."
-      exit 1
+    if grep -Fxq "./${REPO_NAME_ARR[0]}:" $PATH_REPOS; then
+      echo "This repo already exists on repos.yaml.  Skipping."
     else
-      cat <<EOF >> src/repos.yaml
+      if [[ $REPO =~ $REGEX_URL ]]; then
+        cat <<EOF >> $PATH_REPOS
 ./${REPO_NAME_ARR[0]}:
     defaults:
         depth: \$DEPTH_DEFAULT
@@ -119,18 +141,31 @@ add_modules()
     merges:
         - $GIT_DEF_REMOTE \$ODOO_VERSION
 EOF
-      echo "${REPO_NAME_ARR[0]}:" >> src/addons.yaml
+      fi
+    fi
+    if grep -Fxq "${REPO_NAME_ARR[0]}:" $PATH_ADDONS; then
       if [ -z $MODULES ]; then
-        echo "  - \"*\"" >> src/addons.yaml
+        echo "This repo already exists on addons.yaml.  Skipping."
       else
         IFS=',' read -ra MODULES_ARR <<< "$MODULES"
         for MODULE_NAME in "${MODULES_ARR[@]}"
         do
-          echo "  - \"$MODULE_NAME\"" >> src/addons.yaml
+          sed -i "/${REPO_NAME_ARR[0]}:/a \ \ - ${MODULE_NAME}" $PATH_ADDONS
         done
       fi
-      echo -e "\nModules added successfully."
+    else
+      echo "${REPO_NAME_ARR[0]}:" >> $PATH_ADDONS
+      if [ -z $MODULES ]; then
+        echo "  - \"*\"" >> $PATH_ADDONS
+      else
+        IFS=',' read -ra MODULES_ARR <<< "$MODULES"
+        for MODULE_NAME in "${MODULES_ARR[@]}"
+        do
+          echo "  - $MODULE_NAME" >> $PATH_ADDONS
+        done
+      fi
     fi
+    echo -e "\nModules added successfully."
   fi
 }
 
@@ -138,14 +173,19 @@ del_modules()
 {
   REPO_NAME=$1
 
-  if grep -Fxq "./${REPO_NAME}:" src/repos.yaml; then
-    sed -i "/\.\/${REPO_NAME}:/,/^\./{//!d};/\.\/${REPO_NAME}:/d" src/repos.yaml
-    sed -i "/${REPO_NAME}:/, /^[^ ]/{//!d};/${REPO_NAME}:/d" src/addons.yaml
-    echo -e "\nModules deleted successfully."
+  if grep -Fxq "./${REPO_NAME}:" $PATH_REPOS; then
+    sed -i "/\.\/${REPO_NAME}:/,/^\./{//!d};/\.\/${REPO_NAME}:/d" $PATH_REPOS
   else
-    echo "This repo is not present on repos.yaml.  Aborting."
-    exit 1
+    echo "This repo is not present on repos.yaml.  Skipping."
   fi
+
+  if grep -Fxq "${REPO_NAME}:" $PATH_ADDONS; then
+    sed -i "/${REPO_NAME}:/, /^[^ ]/{//!d};/${REPO_NAME}:/d" $PATH_ADDONS
+  else
+    echo "This repo is not present on addons.yaml.  Skipping."
+  fi
+
+  echo -e "\nModules deleted successfully."
 }
 
 # Code from https://github.com/Tecnativa/doodba#run-unit-tests-for-some-addon
@@ -157,7 +197,32 @@ test_modules()
   echo -e "\nTests launched successfully."
 }
 
+list_modules()
+{
+  REPO_NAME=$1
 
+  if [ -z $REPO_NAME ]; then
+    sed -i "/${REPO_NAME}:/, /^[^ ]/{//!d};/${REPO_NAME}:/d" $PATH_ADDONS
+  fi
+  sed -i "/${REPO_NAME}:/, /^[^ ]/{//!d};/${REPO_NAME}:/d" $PATH_ADDONS
+}
+
+install_modules()
+{
+  MODULES=$1
+  docker-compose run --rm odoo odoo -i $MODULES --stop-after-init
+}
+
+update_modules()
+{
+  MODULES=$1
+  docker-compose run --rm odoo odoo -u $MODULES --stop-after-init
+}
+
+run_shell()
+{
+  docker-compose run --rm odoo odoo shell
+}
 #== GIT
 
 # Code from @simahawk: https://github.com/OCA/web/pull/1173#issuecomment-461885122
@@ -165,48 +230,61 @@ fix_history()
 {
   MODULE=$1
   HASH=$2
-  ODOO_VER=$3
+  ODOO_VER=$(sanitize_odoo_version $3)
   ODOO_FROM_VER=$4
 
   if [ -z $ODOO_FROM_VER ]; then
     ODOO_FROM_VER=`expr $ODOO_VER - 1`
+  else
+    ODOO_FROM_VER=$(sanitize_odoo_version $ODOO_FROM_VER)
   fi
 
   if [ -z $ODOO_VER ]; then
     echo "ERROR: Invalid params!  Aborting."
     echo "Syntaxis: git fix-history <module> <hash> <version_to> [version_from]"
-  elif ! [[ $ODOO_VER =~ $REGEX_NUMBER ]] || ! [[ $ODOO_FROM_VER =~ $REGEX_NUMBER ]]; then
-    echo "Invalid Odoo Version.  Aborting."
-    echo "TIP: Pay attention that the script doesn't use x.0 version notation. If you want 11.0 type 11 (without .0 sufix)"
   else
     git fetch $GIT_DEF_REMOTE
-    git reset --hard $GIT_DEF_REMOTE/$ODOO_VER.0
-    git format-patch --keep-subject --stdout $GIT_DEF_REMOTE/$ODOO_VER.0..$GIT_DEF_REMOTE/$ODOO_FROM_VER.0 -- $MODULE | git am -3 --keep
+    git reset --hard $GIT_DEF_REMOTE/$ODOO_VER
+    git format-patch --keep-subject --stdout $GIT_DEF_REMOTE/$ODOO_VER..$GIT_DEF_REMOTE/$ODOO_FROM_VER -- $MODULE | git am -3 --keep
     git cherry-pick $HASH
     echo -e "\nModule git history fixed successfully."
+  fi
+}
+
+fetch_pr()
+{
+  PRNUM=$1
+
+  if [ -z $PRNUM ]; then
+    echo "ERROR: Invalid params!  Aborting."
+    echo "Syntaxis: git use_pr <pr_number>"
+  else
+    git fetch $GIT_DEF_REMOTE pull/$PRNUM/head:pr-$PRNUM
+    git checkout pr-$PRNUM
   fi
 }
 
 mig_module()
 {
   MODULE=$1
-  ODOO_VER=$2
-  ODOO_FROM_VER=$3
+  ODOO_VER=$(sanitize_odoo_version $2)
+  ODOO_FROM_VER=$(sanitize_odoo_version $3)
+  GIT_FROM_REMOTE=$4
 
   if [ -z $ODOO_FROM_VER ]; then
     ODOO_FROM_VER=`expr $ODOO_VER - 1`
+  fi
+  if [ -z $GIT_FROM_REMOTE ]; then
+    GIT_FROM_REMOTE=$GIT_DEF_REMOTE
   fi
 
   if [ -z $ODOO_VER ]; then
     echo "ERROR: Invalid params!  Aborting."
     echo "Syntaxis: git migrate <module> <version>"
-  elif ! [[ $ODOO_VER =~ $REGEX_NUMBER ]]; then
-    echo "Invalid Odoo Version.  Aborting."
-    echo "TIP: Pay attention that the script doesn't use x.0 version notation. If you want 11.0 type 11 (without .0 sufix)"
   else
     git fetch $GIT_DEF_REMOTE
-    git checkout -b $ODOO_VER.0-mig-$MODULE $GIT_DEF_REMOTE/$ODOO_VER.0
-    git format-patch --keep-subject --stdout $GIT_DEF_REMOTE/$ODOO_VER.0..$GIT_DEF_REMOTE/$ODOO_FROM_VER.0 -- $MODULE | git am -3 --keep
+    git checkout -b $ODOO_VER-mig-$MODULE $GIT_DEF_REMOTE/$ODOO_VER
+    git format-patch --keep-subject --stdout $GIT_DEF_REMOTE/$ODOO_VER..$GIT_FROM_REMOTE/$ODOO_FROM_VER -- $MODULE | git am -3 --keep
     echo -e "\nModule migration initialized successfully. Now can start the hard work!"
   fi
 }
@@ -236,13 +314,21 @@ else
       resync_modules
     elif [ "$ACTION" = "test_modules" ]; then
       test_modules $3
+    elif [ "$ACTION" = "install_modules" ]; then
+      install_modules $3
+    elif [ "$ACTION" = "update_modules" ]; then
+      update_modules $3
+    elif [ "$ACTION" = "shell" ]; then
+      run_shell
     else
       ACTION_ERROR=1
     fi
   elif [ "$TOOL" = "git" ]; then
     if [ "$ACTION" = "migrate" ]; then
       mig_module $3 $4 $5
-    elif [ "$ACTION" = "fix-history" ]; then
+    elif [ "$ACTION" = "use_pr" ]; then
+      fetch_pr $3
+    elif [ "$ACTION" = "fix_history" ]; then
       fix_history $3 $4 $5 $6
     else
       ACTION_ERROR=1
