@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 ##########################################################
-# OCA Contrib 0.6.0
+# OCA Contrib 0.7.0
 # 'Copyright' 2019 Alexandre Díaz - <dev@redneboa.es>
 #
 # This script is powered by:
@@ -31,10 +31,14 @@ print_help()
   echo "    · install_modules <modules (separated by comma without spaces)>"
   echo "    · update_modules <modules (separated by comma without spaces)>"
   echo "    · shell"
+  echo "    · bash"
+  echo "    · psql [database (by default is 'postgres')]"
+  echo "    · repair <version>"
   echo "  - git"
   echo "    · migrate <module> <version_to> [version_from]"
   echo "    · use_pr <pr_number>"
   echo "    · fix_history <module> <hash> <version_to> [version_from]"
+  echo "    · show_conflict_files"
   echo "Example: $0 docker create my_project 12"
 }
 
@@ -48,7 +52,7 @@ sanitize_odoo_version()
   if ! [[ $ODOO_VER =~ $REGEX_NUMBER ]]; then
     ODOO_VER="$ODOO_VER.0"
     if ! [[ $ODOO_VER =~ $REGEX_NUMBER ]]; then
-      return
+      ODOO_VER=$1
     fi
   fi
   echo $ODOO_VER
@@ -57,11 +61,30 @@ sanitize_odoo_version()
 
 #== DOCKER
 
+_prepare_docker_files()
+{
+  ODOO_VER=$1
+  IFS='.' read -ra ODOO_VER_S <<< "$ODOO_VER"
+
+  sed -i "s/\(ODOO_MAJOR *= *\).*/\1${ODOO_VER_S[0]}/" .env
+  sed -i "s/\(ODOO_MINOR *= *\).*/\1$ODOO_VER/" .env
+  if [ $(echo "$ODOO_VER < 9.0" | bc) -eq 1 ] ; then
+    sed -i "s/\(- --dev=*\).*/ /" devel.yaml
+  elif [ $ODOO_VER = "9.0" ]; then
+    sed -i "s/\(- --dev*\).*/\1 /" devel.yaml
+  fi
+
+  if [ $(echo "$ODOO_VER > 12.0" | bc) -eq 1 ] ; then
+    sed -i "s/\(DB_MAJOR *= *\).*/\112/" .env
+  else
+    sed -i "s/\(DB_MAJOR *= *\).*/\1${ODOO_VER_S[0]}/" .env
+  fi
+}
+
 create_docker()
 {
   PROJ_NAME=$1
   ODOO_VER=$(sanitize_odoo_version $2)
-  IFS='.' read -ra ODOO_VER_S <<< "$ODOO_VER"
 
   if [ -z $PROJ_NAME ] || [ -z $ODOO_VER ]; then
     echo "ERROR: Invalid params!  Aborting."
@@ -69,13 +92,7 @@ create_docker()
   else
     git clone https://github.com/Tecnativa/doodba-scaffolding.git $PROJ_NAME --depth=1
     cd $PROJ_NAME
-    sed -i "s/\(ODOO_MAJOR *= *\).*/\1${ODOO_VER_S[0]}/" .env
-    sed -i "s/\(ODOO_MINOR *= *\).*/\1$ODOO_VER/" .env
-    if [ $(echo "$ODOO_VER < 9.0" | bc) -eq 1 ] ; then
-      sed -i "s/\(- --dev=*\).*/ /" devel.yaml
-    elif [ $ODOO_VER = "9.0" ]; then
-      sed -i "s/\(- --dev*\).*/\1 /" devel.yaml
-    fi
+    _prepare_docker_files $ODOO_VER
     echo -e "\nDocker created successfully."
   fi
 }
@@ -192,8 +209,9 @@ del_modules()
 test_modules()
 {
   MODULES=$1
-  docker-compose run --rm odoo odoo --stop-after-init --init $MODULES
-  docker-compose run --rm odoo unittest $MODULES
+  docker-compose run --rm odoo addons init -d -w $MODULES
+  docker-compose run --rm odoo addons init -t -w $MODULES
+  docker-compose run --rm odoo addons update -t -w $MODULES
   echo -e "\nTests launched successfully."
 }
 
@@ -222,6 +240,50 @@ update_modules()
 run_shell()
 {
   docker-compose run --rm odoo odoo shell
+}
+
+run_bash()
+{
+  docker-compose run --user root --rm -l traefik.enable=false odoo bash
+}
+
+run_psql()
+{
+  DB=$1
+  if [ -z $DB ]; then
+    DB="postgres"
+  fi
+  docker-compose run --rm odoo psql $DB
+}
+
+repair_folder()
+{
+  ODOO_VER=$(sanitize_odoo_version $1)
+  CURDIR=$PWD
+  CFNAME=$(basename $CURDIR)
+
+  if [ -z $ODOO_VER ]; then
+    echo "ERROR: Invalid params!  Aborting."
+    echo "Syntaxis: docker repair <version>"
+  else
+    read -p "This will be erase all unstagged changes and database volume!! You want continue [y/N]? " USER_RESPONSE
+    if [ "$USER_RESPONSE" = "y" ] || [ "$USER_RESPONSE" = "Y" ]; then
+      echo "Removing volumes..."
+      docker volume rm $CFNAME"_db" || true
+      echo "Restoring base..."
+      git checkout .
+      git checkout $ODOO_VER
+      echo "Restoring addons..."
+      cd odoo/custom/src
+      for file in */; do cd $file && git checkout . && cd ..; done
+      echo "Building containers..."
+      cd $CURDIR
+      _prepare_docker_files $ODOO_VER
+      build_docker
+    else
+      echo "Ok, action skiped!"
+    fi
+  fi
 }
 #== GIT
 
@@ -271,6 +333,8 @@ mig_module()
   ODOO_FROM_VER=$(sanitize_odoo_version $3)
   GIT_FROM_REMOTE=$4
 
+  echo $GIT_FROM_REMOTE
+
   if [ -z $ODOO_FROM_VER ]; then
     ODOO_FROM_VER=`expr $ODOO_VER - 1`
   fi
@@ -289,6 +353,29 @@ mig_module()
   fi
 }
 
+show_conflict_files()
+{
+  git diff --name-only --diff-filter=U
+}
+
+reset_branch()
+{
+  ORIGIN=$1
+  BRANCH=$2
+
+  if [ -z $BRANCH ]; then
+    echo "ERROR: Invalid params!  Aborting."
+    echo "Syntaxis: git reset_branch <branch>"
+  else
+    git fetch --all
+    git reset --hard $ORIGIN/$BRANCH
+  fi
+}
+
+show_log()
+{
+  git log --pretty=format:"%C(Yellow)%h%x09%C(Blue)%an%x09%Creset%s"
+}
 
 
 #== MAIN
@@ -320,16 +407,28 @@ else
       update_modules $3
     elif [ "$ACTION" = "shell" ]; then
       run_shell
+    elif [ "$ACTION" = "bash" ]; then
+      run_bash
+    elif [ "$ACTION" = "psql" ]; then
+      run_psql $3
+    elif [ "$ACTION" = "repair" ]; then
+      repair_folder $3
     else
       ACTION_ERROR=1
     fi
   elif [ "$TOOL" = "git" ]; then
     if [ "$ACTION" = "migrate" ]; then
-      mig_module $3 $4 $5
+      mig_module $3 $4 $5 $6
     elif [ "$ACTION" = "use_pr" ]; then
       fetch_pr $3
     elif [ "$ACTION" = "fix_history" ]; then
       fix_history $3 $4 $5 $6
+    elif [ "$ACTION" = "show_conflict_files" ]; then
+      show_conflict_files
+    elif [ "$ACTION" = "reset_branch" ]; then
+      reset_branch $3 $4
+    elif [ "$ACTION" = "log" ]; then
+      show_log
     else
       ACTION_ERROR=1
     fi

@@ -1,4 +1,4 @@
-# OCA CONTRIB 0.6.0 - Shell Script for BASH
+# OCA CONTRIB 0.7.0 - Shell Script for BASH
 This is a simple tool for development environments focused to avoid repetitive tasks when work with docker (doodba scaffolding) and git.
 You can see it like a recopilation of usefull snippets.
 
@@ -35,6 +35,28 @@ oca_contrib docker add_modules web
 oca_contrib docker build
 docker-compose up
 ```
+
+---
+
+## Table of Parameters
+- [Docker](#-docker-management-doodba) (Scaffolding & Docker operations)
+  - [create](#-create)
+  - [build](#-build)
+  - [add_modules](#-add-modules)
+  - [del_modules](#-delete-modules)
+  - [test_modules](#-test-modules)
+  - [resync_modules](#-resync-modules)
+  - [install_modules](#-install-modules)
+  - [update_modules](#-update-modules)
+  - [shell](#-odoo-shell)
+  - [bash](#-odoo-docker-bash)
+  - [psql](#-db-docker-psql)
+  - [repair](#-docker-repair-folder)
+- [Git](#-git-management)
+  - [migrate](#-migrate)
+  - [use_pr](#-use-pr)
+  - [fix_history](#-fix-history)
+  - [show_conflict_files](#-show-conflicting-files)
 
 ---
 
@@ -148,6 +170,41 @@ Run Odoo shell. _Run this command inside the docker project folder._
 oca_contrib docker shell
 ```
 
+##### ⚫ Odoo Docker Bash
+Run Odoo Docker bash. _Run this command inside the docker project folder._
+
+```sh
+oca_contrib docker bash
+```
+
+##### ⚫ DB Docker psql
+Run docker bash. _Run this command inside the docker project folder._
+
+```sh
+oca_contrib docker psql [database]
+```
+- database > _Optional_. Postgres Database (By default is 'postgres')
+
+Example for devel:
+```sh
+oca_contrib docker psql devel
+```
+
+##### ⚫ Docker Repair Folder
+Restore docker to have a clean folder to rebuild. _Run this command inside the docker project folder._
+
+**/!\ This command can be dangerous!**
+
+```sh
+oca_contrib docker repair <version>
+```
+- version > The Odoo version to use
+
+Example to restore a docker folder to rebuild it with version 12.0:
+```sh
+oca_contrib docker repair 12.0
+```
+
 ### + GIT MANAGEMENT
 For more information see https://github.com/OCA/maintainer-tools/wiki
 ##### ⚫ Migrate
@@ -207,10 +264,18 @@ oca_contrib git fix_history web_shortcut 1234abc567de 12 10
 
 ** Perhaps needs resolve some conflicts to finish the operation.
 
+##### ⚫ Show Conflicting Files
+Show files with conflicts in a merge/rebase operation. _Run this command inside the repository folder._
+
+```sh
+oca_contrib git show_conflict_files
+```
+
 ---
 
 ## ROADMAP
 
+* **MOVE TO PYTHON!!**
 * Improve modules management
 * Add dependencies management
 * Enable/Disable docker network visibility
